@@ -921,8 +921,34 @@ static int avf_read_packet(AVFormatContext *s, AVPacket *pkt)
 
             CVPixelBufferLockBaseAddress(image_buffer, 0);
 
-            data = CVPixelBufferGetBaseAddress(image_buffer);
-            memcpy(pkt->data, data, pkt->size);
+            if(CVPixelBufferGetPixelFormatType(image_buffer) == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange) {
+                // とりあえずnv12だけ
+                uint8_t *src_data, *dst_data;
+                uint32_t stride = 0;
+                uint32_t width = CVPixelBufferGetWidth(image_buffer);
+                uint32_t height = CVPixelBufferGetHeight(image_buffer);
+                dst_data = pkt->data;
+                src_data = CVPixelBufferGetBaseAddressOfPlane(image_buffer, 0);
+                stride   = CVPixelBufferGetBytesPerRowOfPlane(image_buffer, 0);
+                for(int i = 0;i < height;++ i) {
+                    memcpy(dst_data, src_data, width);
+                    dst_data += width;
+                    src_data += stride;
+                }
+//                width  = width;
+                height = height / 2;
+                src_data = CVPixelBufferGetBaseAddressOfPlane(image_buffer, 1);
+                stride   = CVPixelBufferGetBytesPerRowOfPlane(image_buffer, 1);
+                for(int i = 0;i < height;++ i) {
+                    memcpy(dst_data, src_data, width);
+                    dst_data += width;
+                    src_data += stride;
+                }
+            }
+            else {
+                data = CVPixelBufferGetBaseAddress(image_buffer);
+                memcpy(pkt->data, data, pkt->size);
+            }
 
             CVPixelBufferUnlockBaseAddress(image_buffer, 0);
             CFRelease(ctx->current_frame);
